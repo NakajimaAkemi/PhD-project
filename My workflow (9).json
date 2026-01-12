@@ -1,0 +1,1044 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"customer\":\"Customer name extracted from subject (before ' - ')\",\n  \"topic\": \"Topic extracted from subject (after ' - ')\",\n  \"to\": [\"List\", \"of\", \"recipient\", \"email\", \"addresses\"],\n  \"cc\": [\"List\", \"of\", \"recipient\", \"cc\", \"addresses\"],\n  \"bcc\": [\"List\", \"of\", \"recipient\", \"bcc\", \"addresses\"]\n}"
+      },
+      "id": "009b0c89-c6fe-4665-a01c-e40bda64473c",
+      "name": "Structured Output Parser1",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        -4048,
+        288
+      ],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "options": {
+          "prompt": "Instructions:\n--------------\n{instructions}\n--------------\nCompletion:\n--------------\n{completion}\n--------------\n\nAbove, the Completion did not satisfy the constraints given in the Instructions.\nError:\n--------------\n{error}\n--------------\n\nPlease try again. Please only respond with an answer that satisfies the constraints laid out in the Instructions:"
+        }
+      },
+      "id": "7c172e06-f5e7-4171-9064-13f6b02c0f99",
+      "name": "Auto-fixing Output Parser1",
+      "type": "@n8n/n8n-nodes-langchain.outputParserAutofixing",
+      "position": [
+        -4032,
+        96
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=# Email Header Parser Prompt\n\n## System Instructions\n\nYou are an email header parser. Your task is to extract specific fields from email headers and return them in a structured JSON format.\n\n## Input\n\nYou will receive the first N lines of an EML file, which contains email headers. The headers may:\n- Span multiple lines (continuation lines start with whitespace)\n- Be in any order\n- Contain special characters and encodings\n- Have varying formats\n\n## Your Task\n\nExtract the following fields from the headers:\n\n1. **From**: The sender's email address (extract from the From field)\n2. **To**: All recipient email addresses (extract from the To field)\n3. **Subject**: The email subject line (may span multiple lines)\n4. **Customer**: Extract from subject - the part before \" - \" separator\n5. **Topic**: Extract from subject - the part after \" - \" separator\n6. **CC**: Carbon copy recipients (extract from the CC field)\n7. **BCC**: Blind carbon copy recipients (extract from the BCC field)\n8. **Date**: The date/time the email was sent\n\n## Output Format\n\nReturn ONLY a valid JSON object with this exact structure:\n\n```json\n{\n  \"from\": \"sender@example.com\",\n  \"to\": [\"recipient1@example.com\", \"recipient2@example.com\"],\n  \"subject\": \"Email subject line\",\n  \"customer\": \"CustomerName\",\n  \"topic\": \"Topic description\",\n  \"cc\": [\"cc1@example.com\", \"cc2@example.com\"],\n  \"bcc\": null,\n  \"date\": \"Tue, 18 Nov 2025 18:40:06 +0100\"\n}\n```\n\n## Rules\n\n1. **from**: Extract just the email address, remove display names\n2. **to**: Return as an array of email addresses (even if just one)\n3. **subject**: Combine multi-line subjects into a single string\n4. **customer**: Extract from subject - the part before \" - \" (dash with spaces)\n5. **topic**: Extract from subject - the part after \" - \" (dash with spaces)\n   - If no \" - \" separator exists, set customer to null and topic to the full subject\n6. **cc**: Return as an array of email addresses, or `null` if not present\n7. **bcc**: Return as an array of email addresses, or `null` if not present\n8. **date**: Return the date string as-is from the Date header\n9. **Do NOT include**:\n   - Markdown code blocks\n   - Explanations\n   - Additional fields beyond those listed\n   - Any text before or after the JSON\n\n## Example 1\n\n### Input:\n```\nX-Mozilla-Status: 0001\nX-Mozilla-Status2: 00000000\nMessage-ID: <7af5ac4d-3d0c-4cd8-9f40-59691c75b297@skybackbone.it>\nDate: Tue, 18 Nov 2025 18:40:06 +0100\nUser-Agent: Mozilla Thunderbird\nFrom: \"service@skybackbone.it\" <service@skybackbone.it>\nSubject: Cust002 - Task in attesa e TempDB su CMSVSQL02-P\nTo: proactive_beta <proactive_beta@Cust002.com>\nCC: \"cos.paevolution@Cust005.it\" <cos.paevolution@Cust005.it>, vmware opt1\n\t<vmware-op-t1@Cust005.it>\nContent-Language: it\n```\n\n### Output:\n```json\n{\n  \"from\": \"service@skybackbone.it\",\n  \"to\": [\"proactive_beta@Cust002.com\"],\n  \"subject\": \"Cust002 - Task in attesa e TempDB su CMSVSQL02-P\",\n  \"customer\": \"Cust002\",\n  \"topic\": \"Task in attesa e TempDB su CMSVSQL02-P\",\n  \"cc\": [\"cos.paevolution@Cust005.it\", \"vmware-op-t1@Cust005.it\"],\n  \"bcc\": null,\n  \"date\": \"Tue, 18 Nov 2025 18:40:06 +0100\"\n}\n```\n\n## Example 2\n\n### Input:\n```\nX-Mozilla-Status: 0001\nX-Mozilla-Status2: 00000000\nMessage-ID: <1cb5eb00-b0b0-4aeb-b0de-cc2ba84f04af@skybackbone.it>\nDate: Tue, 18 Nov 2025 18:44:38 +0100\nUser-Agent: Mozilla Thunderbird\nFrom: \"service@skybackbone.it\" <service@skybackbone.it>\nSubject: Cust001 - sessioni Oracle libere sull'istanza UDC33LXPROD\n dell'host VDBMEDPROD\nTo: name002 surname002 <mario.rossi.ext@Cust005.it>, \"Cust001\n Helpdesk\" <servicedesk@Cust001.it>\nContent-Language: it\n```\n\n### Output:\n```json\n{\n  \"from\": \"service@skybackbone.it\",\n  \"to\": [\"mario.rossi.ext@Cust005.it\", \"servicedesk@Cust001.it\"],\n  \"subject\": \"Cust001 - sessioni Oracle libere sull'istanza UDC33LXPROD dell'host VDBMEDPROD\",\n  \"customer\": \"Cust001\",\n  \"topic\": \"sessioni Oracle libere sull'istanza UDC33LXPROD dell'host VDBMEDPROD\",\n  \"cc\": null,\n  \"bcc\": null,\n  \"date\": \"Tue, 18 Nov 2025 18:44:38 +0100\"\n}\n```\n\n## Important Notes\n\n- Multi-line headers are indicated by lines starting with whitespace (space or tab)\n- Combine continuation lines with the previous line\n- Extract only email addresses from fields that contain both names and emails (e.g., \"John Doe <john@example.com>\" → \"john@example.com\")\n- If a field is not present in the headers, use `null`\n- Arrays should always be arrays, even for single values\n- Return ONLY the JSON object, no additional text",
+          "maxIterations": 3
+        }
+      },
+      "id": "5e0dc057-1ba7-434c-920b-1823b2d19370",
+      "name": "Parse_Email Agent1",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        -4080,
+        -304
+      ],
+      "typeVersion": 1.7,
+      "alwaysOutputData": false,
+      "retryOnFail": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json.data;\n\nlet lines;\n\n// Normalize to array of lines\nif (typeof data === 'string') {\n  lines = data.split('\\n');\n} else if (Array.isArray(data)) {\n  lines = data;\n} else {\n  lines = Object.values(data);\n}\n\n// Build text body from first 50 lines\nconst textBody = lines.slice(0, 50).join('\\n');\n\n// Return ONE valid n8n item\nreturn [{\n  json: {\n    body: textBody\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4272,
+        -304
+      ],
+      "id": "189a1348-998a-4fb9-8fe2-c25a69965d04",
+      "name": "Email splitter"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = [];\n\nconst data = $input.first().json.output;\n\nconst customer = data.customer;\nconst topic = data.topic;\n\nfunction expand(emails, mailType) {\n  if (!emails || !Array.isArray(emails)) {\n    return items;\n  }\n\n  for (const email of emails) {\n    items.push({\n      json: {\n        CUSTOMER_NAME: customer,\n        MAIL_TYPE: mailType,\n        CUSTOMER_OPERATOR: email,\n        TOPIC: topic,\n      },\n    });\n  }\n}\n\nexpand(data.to, \"TO\");\nexpand(data.cc, \"CC\");\nexpand(data.bcc, \"BCC\");\n\nreturn items;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3744,
+        -320
+      ],
+      "id": "c7970801-9eee-4422-a947-5876a0e3dffc",
+      "name": "Flatten"
+    },
+    {
+      "parameters": {
+        "model": "=llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -4208,
+        256
+      ],
+      "id": "db542e1a-4466-4905-aa3f-40cfdf9d287c",
+      "name": "Judge",
+      "credentials": {
+        "groqApi": {
+          "id": "V5FOgGeAn4vtOlET",
+          "name": "Groq account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": "=llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -4160,
+        16
+      ],
+      "id": "e29bde10-de13-4a57-abdf-698a6a790c7e",
+      "name": "Mail parser",
+      "credentials": {
+        "groqApi": {
+          "id": "V5FOgGeAn4vtOlET",
+          "name": "Groq account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -4672,
+        -272
+      ],
+      "id": "3d7fa593-d237-4995-b681-f9a9446e3150",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "660unepiZB5wKGX1",
+          "name": "Google Drive account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -4496,
+        -288
+      ],
+      "id": "58c570c8-d9e0-40b2-ba1d-f1874d5f2fb6",
+      "name": "Extract from File",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $('Loop Over Items').item.json.subfolders }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1TENSAnrzbZLSc3v1y02p9soa17E3iaXk",
+          "mode": "list",
+          "cachedResultName": "emails",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1TENSAnrzbZLSc3v1y02p9soa17E3iaXk"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -4944,
+        448
+      ],
+      "id": "08e16223-8ef3-4594-a4b8-f9972c2501f8",
+      "name": "Create folder",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "660unepiZB5wKGX1",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a171a81d-46ac-47e4-864e-393bcde05955",
+              "leftValue": "={{ $json }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -5312,
+        384
+      ],
+      "id": "4a6ea4dc-b559-4ec4-a02e-d7134051bb88",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"subfolders\":[\"success\",\"failed\",\"processing\"],\n  \"main_folder\":\"emails\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -6144,
+        192
+      ],
+      "id": "abd63e12-f755-436e-a273-228cae51d5e2",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "batchSize": "=1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -5712,
+        192
+      ],
+      "id": "e82f4c77-0cca-427f-9c89-8bf8ea710f30",
+      "name": "Loop Over Items",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "subfolders",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -5952,
+        192
+      ],
+      "id": "95e23916-0884-4d49-8a4f-0a559ceb31b4",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "={{ $json.subfolders }}",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "1TENSAnrzbZLSc3v1y02p9soa17E3iaXk",
+            "mode": "list",
+            "cachedResultName": "emails",
+            "cachedResultUrl": "https://drive.google.com/drive/folders/1TENSAnrzbZLSc3v1y02p9soa17E3iaXk"
+          },
+          "whatToSearch": "folders"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -5504,
+        288
+      ],
+      "id": "2f023a78-cad0-4fae-8ea6-766ef07b025e",
+      "name": "Check Subfolder",
+      "alwaysOutputData": false,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "660unepiZB5wKGX1",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "move",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('Loop Over Emails').item.json.id }}",
+          "mode": "id"
+        },
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Aggregate').item.json.data[1][' failed'] }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -2960,
+        240
+      ],
+      "id": "375f369f-6e0a-48ed-8fdd-81404e90ec7c",
+      "name": "Move to Failed",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "660unepiZB5wKGX1",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "move",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('Loop Over Emails').item.json.id }}",
+          "mode": "id"
+        },
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Aggregate').item.json.data[0][' success'] }}",
+          "mode": "id"
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -2848,
+        -576
+      ],
+      "id": "18df55ae-139f-4822-855f-b9ab240ce087",
+      "name": "Move to Success",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "660unepiZB5wKGX1",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \" {{ $json.name }}\":{{ $json.id }},\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -4800,
+        528
+      ],
+      "id": "f03d238e-bc3b-4e5d-af42-965b08ab756a",
+      "name": "fetch id"
+    },
+    {
+      "parameters": {
+        "aggregate": "=",
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -5584,
+        -272
+      ],
+      "id": "119cfc35-fb47-408d-895e-40b39a563c75",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "operation": "move",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Aggregate').item.json.data[2][' processing'] }}",
+          "mode": "id"
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -4848,
+        -256
+      ],
+      "id": "ff6b7397-4497-4957-aef0-d25734a416f5",
+      "name": "Move to Processing",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "660unepiZB5wKGX1",
+          "name": "Google Drive account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -6976,
+        176
+      ],
+      "id": "fffdb6c6-6e7a-4e7f-93b7-3d90189f74d7",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a171a81d-46ac-47e4-864e-393bcde05955",
+              "leftValue": "={{ $json }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -6528,
+        176
+      ],
+      "id": "77e6baf8-4192-4f90-b47e-342a0f257e75",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "=emails",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "root",
+            "mode": "list",
+            "cachedResultName": "/ (Root folder)",
+            "cachedResultUrl": "https://drive.google.com/drive"
+          },
+          "whatToSearch": "folders"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -6752,
+        176
+      ],
+      "id": "e1bdced5-4c1d-466c-ba68-5791c9f2473d",
+      "name": "Check Main Folder",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "660unepiZB5wKGX1",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $('Loop Over Items').item.json.subfolders }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1TENSAnrzbZLSc3v1y02p9soa17E3iaXk",
+          "mode": "list",
+          "cachedResultName": "emails",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1TENSAnrzbZLSc3v1y02p9soa17E3iaXk"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -6144,
+        -16
+      ],
+      "id": "3930dba4-666f-4999-9659-bf1857758265",
+      "name": "Create Main folder",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "660unepiZB5wKGX1",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": "=1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -5056,
+        -272
+      ],
+      "id": "78cc7ac5-9624-42c5-abfe-0d2f64bc8626",
+      "name": "Loop Over Emails",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": ".eml",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $('Check Main Folder').item.json.id }}",
+            "mode": "id"
+          },
+          "whatToSearch": "files"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -5408,
+        -272
+      ],
+      "id": "6c8a3b53-fcac-4960-bcbc-d9375244a345",
+      "name": "Check Emails",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "660unepiZB5wKGX1",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "id",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -5248,
+        -272
+      ],
+      "id": "dd8116ee-bc9c-4ac2-a211-bc2beb333683",
+      "name": "Split Out1",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "=CUSTOMER_NAME",
+              "value": "={{ $json.CUSTOMER_NAME }}"
+            },
+            {
+              "name": "MAIL_TYPE",
+              "value": "={{ $json.MAIL_TYPE }}"
+            },
+            {
+              "name": "CUSTOMER_OPERATOR",
+              "value": "={{ $json.CUSTOMER_OPERATOR }}"
+            },
+            {
+              "name": "TOPIC",
+              "value": "={{ $json.TOPIC }}"
+            }
+          ]
+        },
+        "options": {
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -3344,
+        -320
+      ],
+      "id": "3fc43237-5acd-4c96-8428-c894d9eda8ec",
+      "name": "HTTP Request1",
+      "executeOnce": false,
+      "onError": "continueErrorOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Structured Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Auto-fixing Output Parser1",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto-fixing Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Parse_Email Agent1",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse_Email Agent1": {
+      "main": [
+        [
+          {
+            "node": "Flatten",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Move to Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email splitter": {
+      "main": [
+        [
+          {
+            "node": "Parse_Email Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Judge": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Auto-fixing Output Parser1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ],
+      "main": [
+        []
+      ]
+    },
+    "Mail parser": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Parse_Email Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ],
+      "main": [
+        []
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Move to Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Email splitter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Move to Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Create folder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "fetch id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create folder": {
+      "main": [
+        [
+          {
+            "node": "fetch id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Subfolder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Subfolder": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch id": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Check Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Move to Processing": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Move to Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Check Main Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Main Folder": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Create Main folder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Emails": {
+      "main": [
+        [
+          {
+            "node": "Split Out1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Emails": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Move to Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Move to Failed": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Move to Success": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Move to Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Move to Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "ec901c97-419c-44ea-860a-ae50e9a98533",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "562a2176212593783b25ca50a34e7fa7ba0bcfad775afd7c5e3fe99c6c45036d"
+  },
+  "id": "RxZSGR55nq3iHsmt",
+  "tags": []
+}
